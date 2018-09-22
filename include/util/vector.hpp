@@ -157,7 +157,7 @@ public:
     Iterator begin(void) { return _data; }
     ConstIterator cbegin(void) const { return _data; }
     Iterator end(void) { return _data + _size; }
-    ConstIterator end(void) const { return _data + _size; }
+    ConstIterator cend(void) const { return _data + _size; }
 
     // Duplicatation (preferred instead):
     void copy_to(Vector<T>& to) const {
