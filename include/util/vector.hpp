@@ -13,8 +13,6 @@
 #include <stdexcept>
 #include <cstdlib>
 
-#include "alloc.hpp"
-
 namespace MyyuraSat {
 
 template<class T, class _Size = int>
