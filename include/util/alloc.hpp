@@ -13,7 +13,7 @@
 
 namespace MyyuraSat {
 
-template<class T>
+template<typename T>
 class RegionAllocator {
 private:
     T *_memory;

@@ -15,7 +15,7 @@
 
 namespace MyyuraSat {
 
-template<class T, class _Size = int>
+template<typename T, typename _Size = int>
 class Vector {
 public:
     using SizeType = _Size;
