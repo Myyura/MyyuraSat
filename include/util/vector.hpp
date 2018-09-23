@@ -173,6 +173,13 @@ public:
     }
 };
 
+template<typename T> 
+struct IntIndexDefault {
+    typename Vector<T>::SizeType operator()(T t) const {
+        return (typename Vector<T>::SizeType)t;
+    }
+};
+
 };
 
 #endif
