@@ -39,8 +39,10 @@ public:
     using ConstIterator = const V*;
 
     Iterator begin(void) { return &_map[0]; }
+    ConstIterator begin(void) const { return &_map[0]; }
     ConstIterator cbegin(void) const { return &_map[0]; }
     Iterator end(void) { return &_map[_map.size()]; }
+    ConstIterator end(void) const { return &_map[_map.size()]; }
     ConstIterator cend(void) const { return &_map[_map.size()]; }
 
     // Size operations:
