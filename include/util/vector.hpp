@@ -180,6 +180,6 @@ struct IntIndexDefault {
     }
 };
 
-};
+}
 
 #endif
