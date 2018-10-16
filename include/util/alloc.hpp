@@ -47,10 +47,10 @@ private:
     }
 
 public:
-    const std::size_t UNIT_SIZE = sizeof(T);
+    static const std::size_t UNIT_SIZE = sizeof(T);
 
     using RARef = std::uint32_t;
-    const RARef RAREF_UNDEF = std::numeric_limits<uint32_t>::max();
+    static const RARef RAREF_UNDEF = std::numeric_limits<uint32_t>::max();
 
     explicit RegionAllocator(std::uint32_t start_cap = 1024 * 1024):
         _memory(NULL), _size(0), _capacity(0), _wasted(0) {
