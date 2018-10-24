@@ -12,6 +12,8 @@
 #include <new>
 #include <stdexcept>
 #include <cstdlib>
+#include <initializer_list>
+#include <algorithm>
 
 namespace MyyuraSat {
 
@@ -115,10 +117,13 @@ public:
         // _data[_size++] = elem;
     }
 
-    // void push(const T&& elem) {
-    //     if (_size == _capacity) { reserve(_size + 1); }
-    //     _data[_size++] = std::move(elem);
-    // }
+    void push_lazy(const T& elem) {
+        if (_size >= _capacity) {
+            throw std::out_of_range("Vector<T>::push_lazy : out of size");
+        }
+
+        _data[_size++] = elem;
+    }
 
     void insert(const T& elem) {
         if (_size >= _capacity) { throw std::length_error("Vector<T>::insert : out of capacity"); }
