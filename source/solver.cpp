@@ -209,10 +209,10 @@ LiftedBoolean Solver::is_satisfied(const Clause& c) const {
 }
 
 void Solver::unchecked_enqueue(Literal p, CRARef from) {
-    for (Variable i = 0; i < n_variables(); i++) {
-        printf("%d:%d\n", i, value(i).to_int());
-    }
-    printf("enqueue %d %d:%d %d\n", p.to_int(), p.variable(), value(p).to_int(), value(p.variable()).to_int()); 
+    // for (Variable i = 0; i < n_variables(); i++) {
+    //     printf("decision level:%d | %d:%d\n", decision_level(), i, value(i).to_int());
+    // }
+    // printf("enqueue %d %d:%d %d\n", p.to_int(), p.variable(), value(p).to_int(), value(p.variable()).to_int()); 
     if (value(p) != LIFTED_BOOLEAN_UNDEF) {
         throw std::logic_error("Solver::unchecked_enqueue : p has already get an assignment!");
     }
@@ -236,17 +236,53 @@ void Solver::cancel_until(int level) {
     }
 }
 
-// CRARef Solver::propagate() {
-//     CRARef conflict = CRAREF_UNDEF;
+// Unit propagation
+CRARef Solver::propagate() {
+    CRARef conflict = CRAREF_UNDEF;
 
-//     for (; _queue_head < _trail.size();) {
-//         // 'p' is enqueued fact to propagate
-//         Literal p = _trail[_queue_head++];
+    for (; _queue_head < _trail.size();) {
+        // 'p' is enqueued fact to propagate
+        Literal p = _trail[_queue_head++];
 
+        for (CRARef cr : _clauses) {
+            Clause& c = _ca[cr];
+            Literal unassign_lit = LITERAL_UNDEF;
+            int unassign_count = 0;
+            // bool is_found = false;
+            for (int i = 0; i < c.size(); i++) {
+                // if (c[i].to_int() > p.to_int() && !is_found) { break; }
+                
+                // The clause c has already been SAT
+                if (value(c[i]) == LIFTED_BOOLEAN_TRUE) { 
+                    unassign_count = -1;
+                    break;
+                }
 
-//     }
-// }
+                if (value(c[i]) == LIFTED_BOOLEAN_UNDEF) {
+                    unassign_lit = c[i];
+                    unassign_count++;
+                }
 
+                // if (unassign_count == 2) { break; }
+            }
+
+            // The value of unassign_count did not be modified, which means that
+            // all literals in clause c was assigned FALSE, i.e., a conflict
+            if (unassign_count == 0) {
+                return conflict = cr;
+            }
+
+            // Unit propagation
+            if (unassign_count == 1) {
+                unchecked_enqueue(unassign_lit, cr);
+            }
+        }
+    }
+
+    return conflict;
+}
+
+// Branch (with some simple heuristics)
 Literal Solver::pick_branch_literal(void) {
     Variable v = VARIABLE_UNDEF;
     int max_activity = 0;
@@ -288,6 +324,9 @@ LiftedBoolean Solver::search(int n_conflicts) {
     int sat, start = 1;
 
     for (; ;) {
+        // Propagation
+        CRARef conflict = propagate();
+
         sat = 1;
         LiftedBoolean stat = LIFTED_BOOLEAN_FALSE;
         for (auto& cr : _clauses) {
@@ -310,31 +349,42 @@ LiftedBoolean Solver::search(int n_conflicts) {
             return LIFTED_BOOLEAN_TRUE;
         }
 
-        if (start == 1) {
+        if (start) {
+            if (conflict != CRAREF_UNDEF) {
+                return LIFTED_BOOLEAN_FALSE;
+            }
+
             start = 0;
             new_decision_level();
             Literal p = pick_branch_literal();
             unchecked_enqueue(p);
         } else {
-            if (stat == LIFTED_BOOLEAN_UNDEF) {
+            if (stat == LIFTED_BOOLEAN_UNDEF && conflict == CRAREF_UNDEF) {
                 new_decision_level();
                 Literal p = pick_branch_literal();
                 unchecked_enqueue(p);
             } else {
-                printf("Conflict\n");
-                    for (int i = 0; i < n_variables(); i++) {
-                        printf("%d ", _assigns[i].to_int());
-                    }
-                    printf("\n");
-                printf("Back\n");
+                // printf("Conflict\n");
+                //     for (int i = 0; i < n_variables(); i++) {
+                //         printf("%d ", _assigns[i].to_int());
+                //     }
+                //     printf("\n");
+                // printf("Back\n");
+                if (conflict != CRAREF_UNDEF) {
+                    Literal p = _trail[_trail_lim[_trail_lim.size() - 1]];
+                    cancel_until(decision_level() - 1);
+                    new_decision_level();
+                    unchecked_enqueue(p);
+                }
+
                 for (; decision_level() != 0 && _trail[_trail.size() - 1].sign();) {
-                    for (int i = 0; i < n_variables(); i++) {
-                        printf("%d ", _assigns[i].to_int());
-                    }
-                    printf("\n");
+                    // for (int i = 0; i < n_variables(); i++) {
+                    //     printf("%d ", _assigns[i].to_int());
+                    // }
+                    // printf("\n");
                     cancel_until(decision_level() - 1);
                 }
-                printf("Back end\n");
+                // printf("Back end\n");
 
                 if (decision_level() == 0) { 
                     return LIFTED_BOOLEAN_FALSE; 
