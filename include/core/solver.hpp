@@ -14,9 +14,11 @@
 #include "../util/intmap.hpp"
 #include "../util/intset.hpp"
 #include "../util/vector.hpp"
+#include "../util/occurence_list.hpp"
 
 #include <queue>
 #include <stack>
+#include <functional>
 
 namespace MyyuraSat {
 
@@ -49,7 +51,29 @@ private:
         _VariableInfo() {}
         _VariableInfo(CRARef cr, int l) : reason(cr), level(l) {}
     };
+
     VMap<_VariableInfo> _variable_info;
+
+    // 'watches[lit]' is a list of constraints watching 'lit' (will go there if literal becomes true)
+    struct _Watcher {
+        CRARef cref;
+        _Watcher(CRARef cr): cref(cr) {}
+
+        bool operator==(const _Watcher& w) const { return cref == w.cref; }
+        bool operator!=(const _Watcher& w) const { return cref != w.cref; }
+    };
+
+    // std::function<bool (const _Watcher&)> _watcher_deleted 
+    //     = [&](const _Watcher& w) -> bool { return _ca[w.cref].mark() == 1; };
+
+    // struct _WatcherDeleted {
+    //     const ClauseAllocator& ca;
+
+    //     _WatcherDeleted(const ClauseAllocator& caca): ca(caca) {}
+    //     bool operator()(const _Watcher& w) const { return ca[w.cref].mark() == 1; }
+    // };
+    
+    OccurenceList<Literal, _Watcher, Vector<_Watcher>, LiteralIndexDefault> _watches;
 
     // Head of queue (as index into the trail -- no more explicit propagation queue
     int _queue_head;
@@ -87,7 +111,6 @@ private:
     // Statistics
     uint64_t _n_decision_variables, _n_clauses;
 
-    // Main internal methods:
     // Return the next decision variable
     Literal pick_branch_literal(void);
 
@@ -112,7 +135,7 @@ private:
     // Main solve method
     LiftedBoolean _solve(void);
 
-    // Operations on clauses:
+    // Remove a clause from data set
     void remove_clause(CRARef cr);
 
     // Test if a clause has been removed
@@ -124,10 +147,13 @@ private:
     // Returns LTRUE if a clause is satisfied in the current state
     LiftedBoolean is_satisfied(const Clause& c) const;
 
-    // Misc:
     // Add a clause to the solver without making superflous internal copy
     // Will change the passed vector ps
     bool _add_clause(Vector<Literal>& ps);
+
+    // Attach and detach a clause to watcher lists
+    void attach_clause(CRARef cr);
+    void detach_clause(CRARef cr, bool strict = false);
 
     // Gives the current decisionlevel
     int decision_level(void) const;
@@ -142,7 +168,6 @@ public:
     Solver(void);
     virtual ~Solver(void);
 
-    // Problem specification
     // Add a new variable with parameters specifying variable mode
     Variable new_variable(LiftedBoolean upol = LIFTED_BOOLEAN_UNDEF, bool dvar = true);
 
@@ -157,7 +182,6 @@ public:
     bool add_clause(Literal p, Literal q, Literal r, Literal s);
     bool add_empty_clause(void);
 
-    // Solving
     // Removes already satisfied clauses
     bool simplify(void);
 

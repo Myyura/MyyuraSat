@@ -127,7 +127,6 @@ public:
     }
 };
 
-
 // Private methods
 // inline minor methods
 inline CRARef Solver::reason(Variable x) const {
@@ -162,6 +161,22 @@ inline int Solver::decision_level(void) const {
 }
 
 // major methods
+
+void Solver::attach_clause(CRARef cr) {
+    const Clause& c = _ca[cr];
+
+    for (int i = 0; i < c.size(); i++) {
+        _watches[~c[i]].push(_Watcher(cr));
+    }
+}
+
+void Solver::detach_clause(CRARef cr, bool strict) {
+    const Clause& c = _ca[cr];
+
+    // trict or lazy detaching
+    // TODO
+}
+
 bool Solver::_add_clause(Vector<Literal>& ps) {
     if (decision_level() != 0) {
         throw std::logic_error("Solver::_add_clause : decision level is not 0");
@@ -190,6 +205,7 @@ bool Solver::_add_clause(Vector<Literal>& ps) {
     } else {
         CRARef cr = _ca.alloc(ps, false);
         _clauses.push(cr);
+        attach_clause(cr);
     }
 
     return true;
@@ -243,23 +259,25 @@ CRARef Solver::propagate() {
     for (; _queue_head < _trail.size();) {
         // 'p' is enqueued fact to propagate
         Literal p = _trail[_queue_head++];
+        Vector<_Watcher>& ws = _watches.lookup(p);
 
-        for (CRARef cr : _clauses) {
+        for (int i = 0; i < ws.size(); i++) {
+            CRARef cr = ws[i].cref;
             Clause& c = _ca[cr];
             Literal unassign_lit = LITERAL_UNDEF;
             int unassign_count = 0;
             // bool is_found = false;
-            for (int i = 0; i < c.size(); i++) {
+            for (int j = 0; j < c.size(); j++) {
                 // if (c[i].to_int() > p.to_int() && !is_found) { break; }
                 
                 // The clause c has already been SAT
-                if (value(c[i]) == LIFTED_BOOLEAN_TRUE) { 
+                if (value(c[j]) == LIFTED_BOOLEAN_TRUE) { 
                     unassign_count = -1;
                     break;
                 }
 
-                if (value(c[i]) == LIFTED_BOOLEAN_UNDEF) {
-                    unassign_lit = c[i];
+                if (value(c[j]) == LIFTED_BOOLEAN_UNDEF) {
+                    unassign_lit = c[j];
                     unassign_count++;
                 }
 
@@ -506,11 +524,11 @@ inline bool Solver::solve(Literal p, Literal q, Literal r) {
 // inline minor methods end
 
 // major methods
-
 Solver::Solver(void) :
     _myyura(true),
     _queue_head(0),
-    _next_variable(0) {}
+    _next_variable(0),
+    _watches([&](const _Watcher& w) -> bool { return _ca[w.cref].mark() == 1; }) {}
 
 Solver::~Solver() {}
 
@@ -522,6 +540,8 @@ Solver::~Solver() {}
 Variable Solver::new_variable(LiftedBoolean upol, bool dvar) {
     Variable v = _next_variable++;
     
+    _watches.init(Literal(v, false));
+    _watches.init(Literal(v, true));
     _assigns.insert(v, LIFTED_BOOLEAN_UNDEF);
     _variable_info.insert(v, _VariableInfo(CRAREF_UNDEF, 0));
     _polarity.insert(v, false);
