@@ -26,7 +26,7 @@ class Solver {
 private:
     // List of problem clauses and learnt clauses
     Vector<CRARef> _clauses;
-    // Vector<CRARef> _learnts;
+    Vector<CRARef> _learnts;
 
     // assignment stack; stores all assigments made in the order they were made
     Vector<Literal> _trail;
@@ -90,6 +90,8 @@ private:
     Vector<Variable> _released_variables;
     Vector<Variable> _free_variables;
 
+    // Temporaries (to reduce allocation overhead)
+    VMap<char> _seen;
     Vector<Literal> _add_clause_temp;
 
     // If problem is satisfiable, this vector contains the model (if any)
@@ -128,6 +130,9 @@ private:
 
     // Backtrack until a certain level
     void cancel_until(int level);
+
+    // GRASP
+    void analyze(CRARef conflict, Vector<Literal>& out_learnt, int& out_level);
 
     // Search for a given number of conflicts
     LiftedBoolean search(int n_conflicts);

@@ -300,6 +300,64 @@ CRARef Solver::propagate() {
     return conflict;
 }
 
+/**
+ * analyze : (confl : Clause*) (out_learnt : vec<Lit>&) (out_level : int&)  ->  [void]
+ * 
+ * Description:
+ *  Analyze conflict and produce a reason clause.
+ * 
+ */
+void Solver::analyze(CRARef conflict, Vector<Literal>& out_learnt, int& out_level) {
+    if (conflict == CRAREF_UNDEF) {
+        throw std::logic_error("No conflict clause needs to be analyzed!");
+    }
+
+    // Generate conflict clause:
+    Vector<Literal> helper_stack;
+    Clause& c = _ca[conflict];
+    for (int i = 0; i < c.size(); i++) {
+        helper_stack.push(c[i]);
+    }
+
+    for (; !helper_stack.empty();) {
+        Literal p = helper_stack.back();
+        helper_stack.pop();
+
+        if (reason(p.variable()) == CRAREF_UNDEF) {
+            out_learnt.push(p);
+        } else {
+            Clause& d = _ca[reason(p.variable())];
+            for (int i = 0; i < d.size(); i++) {
+                Literal q = d[i];
+
+                if (!_seen[q.variable()] && level(q.variable()) > 0) {
+                    _seen[q.variable()] = 1;
+
+                    if (level(q.variable()) < level(p.variable())) {
+                        out_learnt.push(q);
+                    } else {
+                        helper_stack.push(q);
+                    }
+                }
+            }
+        }
+    }
+
+    // Find correct backtrack level:
+    int max_i = 0;
+    for (int i = 1; i < out_learnt.size(); i++) {
+        if (level(out_learnt[i].variable()) > level(out_learnt[max_i].variable()) ) {
+            max_i = i;
+        }
+    }
+    out_level = level(out_learnt[max_i].variable());
+
+    // Clear _seen
+    for (Variable i = 0; i < n_variables(); i++) {
+        _seen[i] = 0;
+    }
+}
+
 // Branch (with some simple heuristics)
 Literal Solver::pick_branch_literal(void) {
     Variable v = VARIABLE_UNDEF;
@@ -339,6 +397,9 @@ LiftedBoolean Solver::search(int n_conflicts) {
         throw;
     }
 
+    Vector<Literal> learnt_clause;
+    int backtrack_level;
+
     int sat, start = 1;
 
     for (; ;) {
@@ -357,13 +418,6 @@ LiftedBoolean Solver::search(int n_conflicts) {
         }
 
         if (sat == 1) {
-            for (int i = 0; i < n_variables(); i++) {
-                if (_assigns[i] == LIFTED_BOOLEAN_TRUE) {
-                    printf("%d ", i + 1);
-                } else {
-                    printf("-%d ", i + 1);
-                }
-            }
             return LIFTED_BOOLEAN_TRUE;
         }
 
@@ -388,6 +442,15 @@ LiftedBoolean Solver::search(int n_conflicts) {
                 //     }
                 //     printf("\n");
                 // printf("Back\n");
+
+                learnt_clause.clear();
+                analyze(conflict, learnt_clause, backtrack_level);
+                cancel_until(backtrack_level);
+
+                CRARef cr = _ca.alloc(learnt_clause, true);
+                _learnts.push(cr);
+                attach_clause(cr);
+
                 if (conflict != CRAREF_UNDEF) {
                     Literal p = _trail[_trail_lim[_trail_lim.size() - 1]];
                     cancel_until(decision_level() - 1);
@@ -528,6 +591,7 @@ Solver::Solver(void) :
     _myyura(true),
     _queue_head(0),
     _next_variable(0),
+    // May not good to write like this
     _watches([&](const _Watcher& w) -> bool { return _ca[w.cref].mark() == 1; }) {}
 
 Solver::~Solver() {}
@@ -545,6 +609,7 @@ Variable Solver::new_variable(LiftedBoolean upol, bool dvar) {
     _assigns.insert(v, LIFTED_BOOLEAN_UNDEF);
     _variable_info.insert(v, _VariableInfo(CRAREF_UNDEF, 0));
     _polarity.insert(v, false);
+    _seen.insert(v, 0);
     _trail.reserve(v + 1);
 
     return v;
@@ -553,6 +618,13 @@ Variable Solver::new_variable(LiftedBoolean upol, bool dvar) {
 bool Solver::solve_test(void) {
     LiftedBoolean status = search(100);
     if (status == LIFTED_BOOLEAN_TRUE) {
+        for (int i = 0; i < n_variables(); i++) {
+            if (_assigns[i] == LIFTED_BOOLEAN_TRUE) {
+                printf("%d ", i + 1);
+            } else {
+                printf("-%d ", i + 1);
+            }
+        }
         printf("SAT\n");
     } else if (status == LIFTED_BOOLEAN_FALSE) {
         printf("UNSAT\n");
