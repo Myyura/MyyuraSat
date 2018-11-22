@@ -175,6 +175,12 @@ public:
  *     lit_Error  - No subsumption or simplification
  *     lit_Undef  - Clause subsumes 'other'
  *     p          - The literal p can be deleted from 'other'
+ * 
+ * Reference:
+ * [EB05] N.Een, A. Biere. "Effiective preprocessing in SAT through variable and
+ * clause elimination". Proc. of SAT, 2005
+ * 
+ * [Bie] A. Biere. Resolve and expand. In Prel. Proc. SAT 2004
  */
 
 inline Literal Clause::subsumes(const Clause& other) const {

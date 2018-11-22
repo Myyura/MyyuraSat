@@ -7,126 +7,6 @@
 
 using namespace MyyuraSat;
 
-/**
- * Parse dimacs files
- */
-class DimacsReader {
-private:
-    FILE *_in;
-    char* _current_line;
-    int _pos;
-    int _size;
-
-    void skip_whitespace(void) {
-        for (; (_current_line[_pos] >= 9 
-            && _current_line[_pos] <= 13)
-            || _current_line[_pos] == 32; _pos++) {}
-    }
-
-    int parse_integer(void) {
-        int value = 0;
-        bool neg = false;
-        skip_whitespace();
-
-        if (_current_line[_pos] == '-') {
-            neg = true;
-            _pos++;
-        } else if (_current_line[_pos] == '+') {
-            _pos++;
-        }
-
-        if (_current_line[_pos] < '0' || _current_line[_pos] > '9') {
-            fprintf(stderr, "PARSE ERROR! Unexpected char: %c\n", _current_line[_pos]);
-            std::exit(3);
-        }
-
-        for (; _current_line[_pos] >= '0' && _current_line[_pos] <= '9'; _pos++) {
-            value = value * 10 + (_current_line[_pos] - '0');
-        }
-
-        return neg ? -value : value;
-    }
-
-    bool match(const char *s) {
-        for (; *s != '\0'; s++, _pos++) {
-            if (*s != _current_line[_pos]) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    bool read_line(void) {
-        if (fgets(_current_line, _size, _in) == NULL) {
-            return false;
-        }
-
-        _pos = 0;
-        return true;
-    }
-
-    void read_clause(Solver& s, Vector<Literal>& lits) {
-        int parsed_lit, var;
-        lits.clear();
-        for (; ;) {
-            parsed_lit = parse_integer();
-            if (parsed_lit == 0) {
-                break;
-            }
-            var = std::abs(parsed_lit) - 1;
-
-            for (; var >= s.n_variables();) {
-                s.new_variable();
-            }
-
-            lits.push((parsed_lit > 0) ? Literal(var) : ~Literal(var));
-        }
-    }
-
-public:
-    explicit DimacsReader(FILE *input, int line_size = 1024) : _in(input), _pos(0), _size(line_size) {
-        _current_line = (char*)std::realloc(NULL, _size);
-        if (_current_line == NULL) { throw std::bad_alloc(); }
-    }
-
-    ~DimacsReader(void) { std::free(_current_line); }
-
-    void parse_dimacs(Solver& s) {
-        Vector<Literal, int> lits;
-        int vars = 0;
-        int clauses = 0;
-        int count = 0;
-
-        for (; read_line();) {
-            skip_whitespace();
-            if (_current_line[_pos] == '\0') {
-                continue;
-            }
-
-            if (_current_line[_pos] == 'p') {
-                if (match("p cnf")) {
-                    vars = parse_integer();
-                    clauses = parse_integer();
-                } else {
-                    fprintf(stderr, "PARSE ERROR! Unexpected char: %c\n", _current_line[_pos]);
-                    exit(3);
-                }
-            } else if (_current_line[_pos] == 'c' || _current_line[_pos] == 'p') {
-                continue;
-            } else {
-                count++;
-                read_clause(s, lits);
-                s.add_clause(lits);
-            }
-        }
-
-        if (count != clauses) {
-            fprintf(stderr, "PARSE ERROR! DIMACS header mismatch: wrong number of clauses\n");
-        }
-    }
-};
-
 // Private methods
 // inline minor methods
 inline CRARef Solver::reason(Variable x) const {
@@ -161,7 +41,6 @@ inline int Solver::decision_level(void) const {
 }
 
 // major methods
-
 void Solver::attach_clause(CRARef cr) {
     const Clause& c = _ca[cr];
 
@@ -252,7 +131,17 @@ void Solver::cancel_until(int level) {
     }
 }
 
-// Unit propagation
+/**
+ * Unit propagation
+ * 
+ * Reference:
+ * [Wiki UP] https://en.wikipedia.org/wiki/Unit_propagation
+ * 
+ * TODO:
+ * [MZ01] M.W.Moskewicz, C.F. Madigan, Y. Zhao, L. Zhang, S. Malik. "Chaff: 
+ * Engineering an Efficient SAT Solver", Proc. of the 38th Design Automation
+ * Conference, 2001
+ */
 CRARef Solver::propagate() {
     CRARef conflict = CRAREF_UNDEF;
 
@@ -306,6 +195,9 @@ CRARef Solver::propagate() {
  * Description:
  *  Analyze conflict and produce a reason clause.
  * 
+ * Reference:
+ * [MS96] J.P. Marques-Silva, K.A. Sakallah. "GRASP - A New Search Algorithm for 
+ * Satisfiability", ICCAD. IEEE Computer Society Press, 1996
  */
 void Solver::analyze(CRARef conflict, Vector<Literal>& out_learnt, int& out_level) {
     if (conflict == CRAREF_UNDEF) {
@@ -358,7 +250,16 @@ void Solver::analyze(CRARef conflict, Vector<Literal>& out_learnt, int& out_leve
     }
 }
 
-// Branch (with some simple heuristics)
+/**
+ * Branch on literals
+ * 
+ * Reference:
+ * 
+ * TODO:
+ * [MZ01] M.W.Moskewicz, C.F. Madigan, Y. Zhao, L. Zhang, S. Malik. "Chaff: 
+ * Engineering an Efficient SAT Solver", Proc. of the 38th Design Automation
+ * Conference, 2001
+ */
 Literal Solver::pick_branch_literal(void) {
     Variable v = VARIABLE_UNDEF;
     int max_activity = 0;
@@ -629,9 +530,4 @@ bool Solver::solve_test(void) {
     } else if (status == LIFTED_BOOLEAN_FALSE) {
         printf("UNSAT\n");
     }
-}
-
-void Solver::parse_dimacs(FILE* fp) {
-    DimacsReader dr(fp);
-    dr.parse_dimacs((*this));
 }
