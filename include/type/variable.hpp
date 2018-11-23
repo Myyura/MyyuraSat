@@ -12,7 +12,7 @@
 
 namespace MyyuraSat {
 
-using Variable = int;
+using Variable = int32_t;
 const Variable VARIABLE_UNDEF = -2;
 
 template<typename T>

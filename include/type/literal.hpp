@@ -13,7 +13,7 @@ namespace MyyuraSat {
 
 class Literal {
 private:
-    int _lit;
+    int32_t _lit;
 
 public:
     Literal(void) {}
