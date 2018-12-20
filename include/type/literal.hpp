@@ -23,17 +23,19 @@ public:
      */
     Literal(Variable var, bool sign = false) { _lit = var + var + (int)sign; }
 
-    inline bool operator==(const Literal& p) const { return _lit == p._lit; }
-    inline bool operator!=(const Literal& p) const { return _lit != p._lit; }
-    inline bool operator<(const Literal& p) const { return _lit < p._lit; }
+    bool operator==(const Literal& p) const { return _lit == p._lit; }
+    bool operator!=(const Literal& p) const { return _lit != p._lit; }
+    bool operator<(const Literal& p) const { return _lit < p._lit; }
     
-    inline Literal operator~(void) const { Literal q; q._lit = _lit ^ 1; return q; }
-    inline Literal operator^(const bool b) const { Literal q; q._lit = _lit ^ (unsigned int)b; return q; }
+    Literal operator~(void) const { Literal q; q._lit = _lit ^ 1; return q; }
+    Literal operator^(const bool b) const { Literal q; q._lit = _lit ^ (unsigned int)b; return q; }
 
-    inline bool sign(void) const { return _lit & 1; }
-    inline Variable variable(void) const { return _lit >> 1; }
+    bool sign(void) const { return _lit & 1; }
+    Variable variable(void) const { return _lit >> 1; }
 
-    inline int to_int(void) const { return _lit; }
+    int to_int(void) const { return _lit; }
+
+    uint32_t abstraction(void) const { return ((uint32_t)1) << (variable() & 31); }
 };
 
 // some useful constants

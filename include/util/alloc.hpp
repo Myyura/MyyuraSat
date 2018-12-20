@@ -17,9 +17,9 @@ template<typename T>
 class RegionAllocator {
 private:
     T *_memory;
-    std::uint32_t _size;
-    std::uint32_t _capacity;
-    std::uint32_t _wasted;
+    uint32_t _size;
+    uint32_t _capacity;
+    uint32_t _wasted;
 
     void reserve(uint32_t min_cap) {
         if (_capacity >= min_cap) { return; }
@@ -49,18 +49,18 @@ private:
 public:
     static const std::size_t UNIT_SIZE = sizeof(T);
 
-    using RARef = std::uint32_t;
+    using RARef = uint32_t;
     static const RARef RAREF_UNDEF = std::numeric_limits<uint32_t>::max();
 
-    explicit RegionAllocator(std::uint32_t start_cap = 1024 * 1024):
+    explicit RegionAllocator(uint32_t start_cap = 1024 * 1024):
         _memory(NULL), _size(0), _capacity(0), _wasted(0) {
         reserve(start_cap);
     }
 
     ~RegionAllocator(void) { if (_memory != NULL) { std::free(_memory); } }
 
-    std::uint32_t size(void) const { return _size; }
-    std::uint32_t wasted(void) const { return _wasted; }
+    uint32_t size(void) const { return _size; }
+    uint32_t wasted(void) const { return _wasted; }
 
     RARef alloc (int size) {
         if (size <= 0) {

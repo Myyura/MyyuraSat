@@ -19,6 +19,7 @@
 #include <queue>
 #include <stack>
 #include <functional>
+#include <iostream>
 
 namespace MyyuraSat {
 
@@ -54,7 +55,7 @@ private:
 
     VMap<_VariableInfo> _variable_info;
 
-    // 'watches[lit]' is a list of constraints watching 'lit' (will go there if literal becomes true)
+    // '_watches[lit]' is a list of constraints watching 'lit' (will go there if literal becomes true)
     struct _Watcher {
         CRARef cref;
         _Watcher(CRARef cr): cref(cr) {}
@@ -75,6 +76,10 @@ private:
     
     OccurenceList<Literal, _Watcher, Vector<_Watcher>, LiteralIndexDefault> _watches;
 
+        // Attach and detach a clause to watcher lists
+    void attach_clause_watcher(CRARef cr);
+    void detach_clause_watcher(CRARef cr, bool strict = false);
+
     // Head of queue (as index into the trail -- no more explicit propagation queue
     int _queue_head;
 
@@ -89,10 +94,6 @@ private:
 
     Vector<Variable> _released_variables;
     Vector<Variable> _free_variables;
-
-    // Temporaries (to reduce allocation overhead)
-    VMap<char> _seen;
-    Vector<Literal> _add_clause_temp;
 
     // If problem is satisfiable, this vector contains the model (if any)
     Vector<LiftedBoolean> _model_value;
@@ -156,16 +157,43 @@ private:
     // Will change the passed vector ps
     bool _add_clause(Vector<Literal>& ps);
 
-    // Attach and detach a clause to watcher lists
-    void attach_clause(CRARef cr);
-    void detach_clause(CRARef cr, bool strict = false);
-
     // Gives the current decisionlevel
     int decision_level(void) const;
 
     CRARef reason(Variable x) const;
     int level(Variable x) const;
 
+    /**
+     * Subsumption:
+     * 
+     * '_occur[lit]' - a list of constraints containing 'lit'
+     * 'touched' - Set to true when a variable is touched. Also true initially
+     * 'touched_list' - A list of the true elements in 'touched'
+     * 'added' : Clauses created
+     * 'strengthened' : Clauses strengthened
+     */
+    OccurenceList<Literal, CRARef, Vector<CRARef>, LiteralIndexDefault> _occur_lit;
+
+    void attach_clause_occlit(CRARef cr, CRARef overwrite = CRAREF_UNDEF);
+
+    VMap<bool> _touched;
+    Vector<Variable> _touched_list;
+    CSet _added;
+    CSet _strengthened;
+
+    void find_subsumed(const CRARef cr, Vector<CRARef>& out_subsumed);
+    void touch(const Variable& x);
+    void touch(const Literal& p);
+
+    /**
+     * Temporaries (to reduce allocation overhead)
+     */
+    VMap<char> _seen;
+    Vector<Literal> _add_clause_temp;
+
+    /**
+     * Garbage collection:
+     */
     void reloc_all(ClauseAllocator& to);
 
 public:
@@ -204,8 +232,6 @@ public:
 
     // Search without assumptions
     bool solve(void);
-    
-    bool solve_test(void);
 
     // Iterate over clauses and top-level assignments
     // ClauseIterator clauses_begin(void) const;
@@ -241,18 +267,24 @@ public:
     // Print some current statistics to standard output
     void print_status(void) const;
 
+    // Print the current set of clauses and trail of assignments, mainly for tests
+    void print_clauses(void) const;
+    void print_assignments(void) const;
+
     // Memory managment
-    // virtual void garbage_collect(void);
-    // void check_garbage(void);
-    // void check_garbage(double gf);
+    virtual void garbage_collect(void);
+    void check_garbage(void);
+    void check_garbage(double gf);
 
     // Mode of operation
     // The fraction of wasted memory allowed before a garbage collection is 
     // triggered
     double garbage_frac;
 
-    // Read instance
-    void parse_dimacs(FILE* fp);
+    // Only for debugging
+    bool solve_test(void);
+    void clause_test(void);
+    void garbage_collection_test(void);
 };
 
 }

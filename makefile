@@ -4,11 +4,14 @@ OBJECT = ./object
 
 OPTION = -std=c++14
 
-MyyuraSat: solver.o main.o
-	g++ $(OPTION) $(OBJECT)/solver.o $(OBJECT)/main.o -o MyyuraSat
+MyyuraSat: main.o
+	g++ $(OPTION) $(OBJECT)/main.o -o MyyuraSat
 
-main.o: $(INCLUDE)/core/solver.hpp $(SOURCE)/main.cpp
+# solver.o: $(INCLUDE)/core/solver.hpp $(SOURCE)/solver.cpp
+# 	g++ $(OPTION) -c $(SOURCE)/solver.cpp -o $(OBJECT)/solver.o
+
+main.o: $(INCLUDE)/core/solver.hpp $(SOURCE)/solver_basic.cpp $(SOURCE)/solver_search.cpp $(SOURCE)/solver_simplify.cpp $(SOURCE)/solver_debug.cpp $(SOURCE)/main.cpp
 	g++ $(OPTION) -c $(SOURCE)/main.cpp -o $(OBJECT)/main.o
 
-solver.o: $(INCLUDE)/core/solver.hpp $(SOURCE)/solver.cpp
-	g++ $(OPTION) -c $(SOURCE)/solver.cpp -o $(OBJECT)/solver.o
+clean: 
+	rm ./MyyuraSat $(OBJECT)/*.o

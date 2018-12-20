@@ -1,5 +1,6 @@
 /**
  * The SAT solver
+ * The Search Part
  */
 
 #include "../include/core/solver.hpp"
@@ -22,16 +23,6 @@ inline bool Solver::enqueue(Literal p, CRARef from) {
         value(p) != LIFTED_BOOLEAN_FALSE : (unchecked_enqueue(p, from), true);
 }
 
-inline bool Solver::is_removed(CRARef cr) const {
-    return _ca[cr].mark() == 1;
-}
-
-inline bool Solver::is_locked(const Clause& c) const {
-    return value(c[0]) == LIFTED_BOOLEAN_TRUE
-        && reason(c[0].variable()) != CRAREF_UNDEF
-        && _ca.lea(reason(c[0].variable())) == &c;
-}
-
 inline void Solver::new_decision_level(void) {
     _trail_lim.push(_trail.size());
 }
@@ -41,7 +32,7 @@ inline int Solver::decision_level(void) const {
 }
 
 // major methods
-void Solver::attach_clause(CRARef cr) {
+void Solver::attach_clause_watcher(CRARef cr) {
     const Clause& c = _ca[cr];
 
     for (int i = 0; i < c.size(); i++) {
@@ -49,45 +40,11 @@ void Solver::attach_clause(CRARef cr) {
     }
 }
 
-void Solver::detach_clause(CRARef cr, bool strict) {
+void Solver::detach_clause_watcher(CRARef cr, bool strict) {
     const Clause& c = _ca[cr];
 
-    // trict or lazy detaching
+    // strict or lazy detaching
     // TODO
-}
-
-bool Solver::_add_clause(Vector<Literal>& ps) {
-    if (decision_level() != 0) {
-        throw std::logic_error("Solver::_add_clause : decision level is not 0");
-    }
-
-    // Check if clause is satisfied and remove false/duplicate literals
-    std::sort(ps.begin(), ps.end());
-
-    // Bug here ？
-    Literal p;
-    int i, j;
-    for (i = j = 0, p = LITERAL_UNDEF; i < ps.size(); i++) {
-        if (value(ps[i]) == LIFTED_BOOLEAN_TRUE || ps[i] == ~p) {
-            return true;
-        } else if (value(ps[i]) != LIFTED_BOOLEAN_FALSE && ps[i] != p) {
-            ps[j++] = p = ps[i];
-        }
-    }
-    ps.shrink(i - j);
-
-    if (ps.size() == 0) {
-        return _myyura = false;
-    } else if (ps.size() == 1 && false) {
-        // TODO : 
-        // ... unchecked_enqueue(ps[0]);
-    } else {
-        CRARef cr = _ca.alloc(ps, false);
-        _clauses.push(cr);
-        attach_clause(cr);
-    }
-
-    return true;
 }
 
 LiftedBoolean Solver::is_satisfied(const Clause& c) const {
@@ -350,7 +307,7 @@ LiftedBoolean Solver::search(int n_conflicts) {
 
                 CRARef cr = _ca.alloc(learnt_clause, true);
                 _learnts.push(cr);
-                attach_clause(cr);
+                attach_clause_watcher(cr);
 
                 if (conflict != CRAREF_UNDEF) {
                     Literal p = _trail[_trail_lim[_trail_lim.size() - 1]];
@@ -378,156 +335,5 @@ LiftedBoolean Solver::search(int n_conflicts) {
                 unchecked_enqueue(~p);
             }
         }
-    }
-}
-
-// Public methods
-// inline minor methods
-// inline void Solver::check_garbage(void) {
-    
-// }
-
-// inline void Solver::check_garbage(double gf) {
-
-// }
-
-inline int Solver::n_variables(void) const {
-    return _next_variable;
-}
-
-inline bool Solver::add_clause(const Vector<Literal>& ps) {
-    ps.copy_to(_add_clause_temp);
-    return _add_clause(_add_clause_temp);
-}
-
-inline bool Solver::add_clause(Literal p) {
-    _add_clause_temp.clear();
-    _add_clause_temp.push(p);
-    return _add_clause(_add_clause_temp);
-}
-
-inline bool Solver::add_clause(Literal p, Literal q) {
-    _add_clause_temp.clear();
-    _add_clause_temp.push(p);
-    _add_clause_temp.push(q);
-    return _add_clause(_add_clause_temp);
-}
-
-inline bool Solver::add_clause(Literal p, Literal q, Literal r) {
-    _add_clause_temp.clear();
-    _add_clause_temp.push(p);
-    _add_clause_temp.push(q);
-    _add_clause_temp.push(r);
-    return _add_clause(_add_clause_temp);
-}
-
-inline bool Solver::add_clause(Literal p, Literal q, Literal r, Literal s) {
-    _add_clause_temp.clear();
-    _add_clause_temp.push(p);
-    _add_clause_temp.push(q);
-    _add_clause_temp.push(r);
-    _add_clause_temp.push(s);
-    return _add_clause(_add_clause_temp);
-}
-
-inline bool Solver::add_empty_clause(void) {
-    _add_clause_temp.clear();
-    return _add_clause(_add_clause_temp);
-}
-
-inline LiftedBoolean Solver::value(Variable x) const {
-    return _assigns[x];
-}
-
-inline LiftedBoolean Solver::value(Literal p) const {
-    return _assigns[p.variable()] ^ p.sign();
-}
-
-inline LiftedBoolean Solver::model_value(Variable x) const {
-    return _model_value[x];
-}
-
-inline LiftedBoolean Solver::model_value(Literal p) const {
-    return _model_value[p.variable()] ^ p.sign();
-}
-
-inline int Solver::n_assigns(void) const {
-    return _trail.size();
-}
-
-inline int Solver::n_clauses(void) const {
-    return _n_clauses;
-}
-
-inline bool Solver::solve(void) {
-    _assumptions.clear();
-    return _solve() == LIFTED_BOOLEAN_TRUE;
-}
-
-inline bool Solver::solve(Literal p) {
-    _assumptions.clear();
-    _assumptions.push(p);
-    return _solve() == LIFTED_BOOLEAN_TRUE;
-}
-
-inline bool Solver::solve(Literal p, Literal q) {
-    _assumptions.clear();
-    _assumptions.push(p);
-    _assumptions.push(q);
-    return _solve() == LIFTED_BOOLEAN_TRUE;
-}
-
-inline bool Solver::solve(Literal p, Literal q, Literal r) {
-    _assumptions.clear();
-    _assumptions.push(p);
-    _assumptions.push(q);
-    _assumptions.push(r);
-    return _solve() == LIFTED_BOOLEAN_TRUE;
-}
-
-// inline minor methods end
-
-// major methods
-Solver::Solver(void) :
-    _myyura(true),
-    _queue_head(0),
-    _next_variable(0),
-    // May not good to write like this
-    _watches([&](const _Watcher& w) -> bool { return _ca[w.cref].mark() == 1; }) {}
-
-Solver::~Solver() {}
-
-/**
- * Creates a new SAT variable in the solver. If 'decision' is cleared, variable 
- * will not be used as a decision variable (NOTE! This has effects on the 
- * meaning of a SATISFIABLE result).
- */
-Variable Solver::new_variable(LiftedBoolean upol, bool dvar) {
-    Variable v = _next_variable++;
-    
-    _watches.init(Literal(v, false));
-    _watches.init(Literal(v, true));
-    _assigns.insert(v, LIFTED_BOOLEAN_UNDEF);
-    _variable_info.insert(v, _VariableInfo(CRAREF_UNDEF, 0));
-    _polarity.insert(v, false);
-    _seen.insert(v, 0);
-    _trail.reserve(v + 1);
-
-    return v;
-}
-
-bool Solver::solve_test(void) {
-    LiftedBoolean status = search(100);
-    if (status == LIFTED_BOOLEAN_TRUE) {
-        for (int i = 0; i < n_variables(); i++) {
-            if (_assigns[i] == LIFTED_BOOLEAN_TRUE) {
-                printf("%d ", i + 1);
-            } else {
-                printf("-%d ", i + 1);
-            }
-        }
-        printf("SAT\n");
-    } else if (status == LIFTED_BOOLEAN_FALSE) {
-        printf("UNSAT\n");
     }
 }
