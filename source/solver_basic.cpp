@@ -48,6 +48,22 @@ bool Solver::_add_clause(Vector<Literal>& ps) {
         return _myyura = (propagate() == CRAREF_UNDEF);
     } else {
         CRARef cr = _ca.alloc(ps, false);
+
+        /**
+         * Subsumption
+         * 
+         * TODO : a flag to off
+         */
+        if (is_subsumed(cr)) {
+            _ca.free(cr);
+            /**
+             * After all clauses are added, function check_garbage will be 
+             * called.
+             */
+
+            return false;
+        }
+
         _clauses.push(cr);
         attach_clause_watcher(cr);
 
@@ -93,6 +109,18 @@ void Solver::reloc_all(ClauseAllocator& to) {
         }
     }
     _clauses.shrink(i - j);
+}
+
+void Solver::garbage_collect(void) {
+    /**
+     * Initialize the next region to a size corresponding to the estimated 
+     * utilization degree. This is not precise but should avoid some unnecessary 
+     * reallocations for the new region:
+     */
+    ClauseAllocator to(_ca.size() - _ca.wasted());
+
+    reloc_all(to);
+    to.move_to(_ca);
 }
 
 // Public *********************************************************************
@@ -201,6 +229,7 @@ inline bool Solver::solve(Literal p, Literal q, Literal r) {
 }
 
 inline void Solver::print_clauses(void) const {
+    std::cout << "print clauses begin: ==================================" << std::endl;
     for (int i = 0; i < _clauses.size(); i++) {
         const Clause& c = _ca[_clauses[i]];
         std::cout << i << " : ";
@@ -208,6 +237,17 @@ inline void Solver::print_clauses(void) const {
             std::cout << c[j].to_int() << " ";
         }
         std::cout << std::endl;
+    }
+    std::cout << "print clauses end: ====================================" << std::endl;
+}
+
+inline void Solver::check_garbage(void) {
+    return check_garbage(_garbage_frac);
+}
+
+inline void Solver::check_garbage(double gf) {
+    if (_ca.wasted() > _ca.size() * gf) {
+        garbage_collect();
     }
 }
 
@@ -218,6 +258,7 @@ Solver::Solver(void) :
     _myyura(true),
     _queue_head(0),
     _next_variable(0),
+    _garbage_frac(0.0),
     // May not good to write like this
     _watches([&](const _Watcher& w) -> bool { return _ca[w.cref].mark() == 1; }),
     _occur_lit([&](const CRARef& cr) -> bool { return _ca[cr].mark() == 1; }) 
@@ -246,16 +287,4 @@ Variable Solver::new_variable(LiftedBoolean upol, bool dvar) {
     _trail.reserve(v + 1);
 
     return v;
-}
-
-void Solver::garbage_collect(void) {
-    /**
-     * Initialize the next region to a size corresponding to the estimated 
-     * utilization degree. This is not precise but should avoid some unnecessary 
-     * reallocations for the new region:
-     */
-    ClauseAllocator to(_ca.size() - _ca.wasted());
-
-    reloc_all(to);
-    to.move_to(_ca);
 }

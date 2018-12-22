@@ -147,7 +147,7 @@ CRARef Solver::propagate() {
 }
 
 /**
- * analyze : (confl : Clause*) (out_learnt : vec<Lit>&) (out_level : int&)  ->  [void]
+ * analyze : (confl : Clause*) (out_learnt : Vector<Lit>&) (out_level : int&)  ->  [void]
  * 
  * Description:
  *  Analyze conflict and produce a reason clause.

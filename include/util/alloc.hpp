@@ -62,7 +62,7 @@ public:
     uint32_t size(void) const { return _size; }
     uint32_t wasted(void) const { return _wasted; }
 
-    RARef alloc (int size) {
+    RARef alloc(int size) {
         if (size <= 0) {
             throw std::invalid_argument("RegionAllocator<T>::alloc(int size) : the argument size must be greater than 0");
         }
@@ -109,7 +109,7 @@ public:
 
         return &_memory[r];
     }
-    RARef ael (const T* t) {
+    RARef ael(const T* t) {
         // Modified >= to >
         if ((void *)t < (void *)&_memory[0] || (void *)t > (void *)&_memory[_size - 1]) {
             throw std::out_of_range("RegionAllocator<T>::ael() : index is out of range");

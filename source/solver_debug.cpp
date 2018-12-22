@@ -63,3 +63,38 @@ void Solver::garbage_collection_test(void) {
     garbage_collect();
     print_clauses();
 }
+
+void Solver::subsumption_test(void) {
+    Vector<Literal> A = {Literal(1, 0), Literal(2, 0), Literal(3, 0)};
+    Vector<Literal> B = {Literal(1, 0), Literal(2, 0)};
+    Vector<Literal> C = {Literal(1, 0), Literal(2, 0), Literal(4, 0)};
+
+    Vector<Literal> E = {Literal(2, 0), Literal(4, 0)};
+    Vector<Literal> F = {Literal(4, 0), Literal(2, 0), Literal(5, 0)};
+    Vector<Literal> G = {Literal(2, 0), Literal(4, 0)};
+    Vector<Literal> D = {Literal(3, 0), Literal(2, 0)};
+
+    for (int i = 0; i <= 5; i++) {
+        new_variable();
+    }
+
+    _ca.extra_clause_field(true);
+
+    print_clauses();
+
+    add_clause(A);
+    add_clause(B);
+    add_clause(C);
+    add_clause(D);
+    add_clause(E);
+    add_clause(F);
+    add_clause(G);
+
+    check_garbage();
+
+    print_clauses();
+    // reduction_subsumption(_clauses[1]);
+    // print_clauses();
+
+
+}

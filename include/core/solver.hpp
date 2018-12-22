@@ -181,7 +181,9 @@ private:
     CSet _added;
     CSet _strengthened;
 
-    void find_subsumed(const CRARef cr, Vector<CRARef>& out_subsumed);
+    void find_subsumed(CRARef cr, Vector<CRARef>& out_subsumed);
+    bool is_subsumed(CRARef cr);
+    void reduction_subsumption(CRARef cr);
     void touch(const Variable& x);
     void touch(const Literal& p);
 
@@ -193,8 +195,13 @@ private:
 
     /**
      * Garbage collection:
+     * 
+     *  _garbage_frac - The fraction of wasted memory allowed before a garbage 
+     * collection is triggered
      */
     void reloc_all(ClauseAllocator& to);
+    virtual void garbage_collect(void);
+    double _garbage_frac;
 
 public:
     // Constructor & Destructor
@@ -271,20 +278,19 @@ public:
     void print_clauses(void) const;
     void print_assignments(void) const;
 
-    // Memory managment
-    virtual void garbage_collect(void);
+    /**
+     * Memory managment
+     */
     void check_garbage(void);
     void check_garbage(double gf);
 
     // Mode of operation
-    // The fraction of wasted memory allowed before a garbage collection is 
-    // triggered
-    double garbage_frac;
 
     // Only for debugging
     bool solve_test(void);
     void clause_test(void);
     void garbage_collection_test(void);
+    void subsumption_test(void);
 };
 
 }

@@ -180,13 +180,13 @@ public:
  * subsumes : (other : const Clause&)  ->  Lit
  *
  * Description:
- *     Checks if clause subsumes 'other', and at the same time, if it can be 
+ *  Checks if clause subsumes 'other', and at the same time, if it can be 
  * used to simplify 'other' by subsumption resolution.
  *
  * Result:
- *     LITERAL_ERROR - No subsumption or simplification
- *     LITERAL_UNDEF - Clause subsumes 'other'
- *     Literal p     - The literal p can be deleted from 'other'
+ *  LITERAL_ERROR - No subsumption or simplification
+ *  LITERAL_UNDEF - Clause subsumes 'other'
+ *  Literal p     - The literal p can be deleted from 'other'
  * 
  * Reference:
  * [EB05] N.Een, A. Biere. "Effiective preprocessing in SAT through variable and

@@ -23,6 +23,8 @@ int main(int argc, char **argv) {
 
     // s.clause_test();
 
-    s.garbage_collection_test();
+    // s.garbage_collection_test();
+
+    s.subsumption_test();
     return 0;
 }
