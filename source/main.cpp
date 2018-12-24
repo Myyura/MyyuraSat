@@ -11,20 +11,21 @@
 #include <iostream>
 
 int main(int argc, char **argv) {
-    // FILE *fp = fopen(argv[1], "r");
+    FILE *fp = fopen(argv[1], "r");
     MyyuraSat::Solver s;
     // s.add_empty_clause();
-    // parse_dimacs(fp, s);
+    parse_dimacs(fp, s);
+    s.check_garbage();
     // s.print_clauses();
-    // int start_time = clock();
-    // s.solve_test();
-    // int end_time = clock();
-    // std::cout << (double)(end_time - start_time) / CLOCKS_PER_SEC << std::endl;
+    int start_time = clock();
+    s.solve_test();
+    int end_time = clock();
+    std::cout << (double)(end_time - start_time) / CLOCKS_PER_SEC << std::endl;
 
     // s.clause_test();
 
     // s.garbage_collection_test();
 
-    s.subsumption_test();
+    // s.subsumption_test();
     return 0;
 }

@@ -35,16 +35,25 @@ inline int Solver::decision_level(void) const {
 void Solver::attach_clause_watcher(CRARef cr) {
     const Clause& c = _ca[cr];
 
-    for (int i = 0; i < c.size(); i++) {
-        _watches[~c[i]].push(_Watcher(cr));
-    }
+    _watches[~c[0]].push(_Watcher(cr, c[1]));
+    _watches[~c[1]].push(_Watcher(cr, c[0]));
+
+    // for (int i = 0; i < c.size(); i++) {
+    //     _watches[~c[i]].push(_Watcher(cr));
+    // }
 }
 
 void Solver::detach_clause_watcher(CRARef cr, bool strict) {
     const Clause& c = _ca[cr];
 
     // strict or lazy detaching
-    // TODO
+    if (strict) {
+        remove(_watches[~c[0]], _Watcher(cr, c[1]));
+        remove(_watches[~c[1]], _Watcher(cr, c[0]));
+    } else {
+        _watches.smudge(~c[0]);
+        _watches.smudge(~c[1]);
+    }
 }
 
 LiftedBoolean Solver::is_satisfied(const Clause& c) const {
@@ -100,54 +109,79 @@ void Solver::cancel_until(int level) {
  * Conference, 2001
  */
 CRARef Solver::propagate() {
+    std::cout << "propagate begin! =================" << std::endl;
     CRARef conflict = CRAREF_UNDEF;
 
     for (; _queue_head < _trail.size();) {
         // 'p' is enqueued fact to propagate
         Literal p = _trail[_queue_head++];
         Vector<_Watcher>& ws = _watches.lookup(p);
+        Vector<_Watcher>::Iterator i, j;
 
-        for (int i = 0; i < ws.size(); i++) {
-            CRARef cr = ws[i].cref;
+        for (i = j = ws.begin(); i != ws.end();) {
+            // Try to avoid inspecting the clause:
+            Literal blocker = (*i).blocker;
+            if (value(blocker) == LIFTED_BOOLEAN_TRUE) {
+                *j++ = *i++;
+                continue;
+            }
+
+            CRARef cr = (*i).cref;
+            // std::cout << "cr: " << cr << " | size: " << _ca.size() << std::endl;
             Clause& c = _ca[cr];
-            Literal unassign_lit = LITERAL_UNDEF;
-            int unassign_count = 0;
-            // bool is_found = false;
-            for (int j = 0; j < c.size(); j++) {
-                // if (c[i].to_int() > p.to_int() && !is_found) { break; }
-                
-                // The clause c has already been SAT
-                if (value(c[j]) == LIFTED_BOOLEAN_TRUE) { 
-                    unassign_count = -1;
+
+            // Make sure the false literal is _data[1]:
+            Literal false_lit = ~p;
+            if (c[0] == false_lit) {
+                c[0] = c[1];
+                c[1] = false_lit;
+            }
+            i++;
+
+            // If 0th watch is true, then clause is already satisfied.
+            Literal first = c[0];
+            _Watcher w(cr, first);
+            if (first != blocker && value(first) == LIFTED_BOOLEAN_TRUE) {
+                *j++ = w; 
+                continue; 
+            }
+
+            // Look for new watch:
+            bool found_watch = false;
+            for (int k = 2; k < c.size(); k++) {
+                if (value(c[k]) != LIFTED_BOOLEAN_FALSE) {
+                    c[1] = c[k];
+                    c[k] = false_lit;
+                    _watches[~c[1]].push(w);
+                    found_watch = true;
                     break;
                 }
+            }
 
-                if (value(c[j]) == LIFTED_BOOLEAN_UNDEF) {
-                    unassign_lit = c[j];
-                    unassign_count++;
+            if (!found_watch) {
+                // Did not find watch -- clause is unit under assignment:
+                *j++ = w;
+                if (value(first) == LIFTED_BOOLEAN_FALSE){
+                    conflict = cr;
+                    _queue_head = _trail.size();
+                    // Copy the remaining watches:
+                    while (i != ws.end()) {
+                        *j++ = *i++;
+                    }
+                } else {
+                    unchecked_enqueue(first, cr);
                 }
-
-                // if (unassign_count == 2) { break; }
-            }
-
-            // The value of unassign_count did not be modified, which means that
-            // all literals in clause c was assigned FALSE, i.e., a conflict
-            if (unassign_count == 0) {
-                return conflict = cr;
-            }
-
-            // Unit propagation
-            if (unassign_count == 1) {
-                unchecked_enqueue(unassign_lit, cr);
             }
         }
-    }
 
+        ws.shrink(i - j);
+    }
+    std::cout << "propagate end! =================" << std::endl;
     return conflict;
 }
 
 /**
- * analyze : (confl : Clause*) (out_learnt : Vector<Lit>&) (out_level : int&)  ->  [void]
+ * analyze : (conflict : Clause*) (out_learnt : Vector<Literal>&) (out_level : int&)  ->  [void]
  * 
  * Description:
  *  Analyze conflict and produce a reason clause.
@@ -160,51 +194,70 @@ void Solver::analyze(CRARef conflict, Vector<Literal>& out_learnt, int& out_leve
     if (conflict == CRAREF_UNDEF) {
         throw std::logic_error("No conflict clause needs to be analyzed!");
     }
-
+    std::cout << "analyze begin=============" << std::endl;
     // Generate conflict clause:
-    Vector<Literal> helper_stack;
-    Clause& c = _ca[conflict];
-    for (int i = 0; i < c.size(); i++) {
-        helper_stack.push(c[i]);
-    }
+    int path_conflict = 0;
+    Literal p = LITERAL_UNDEF;
 
-    for (; !helper_stack.empty();) {
-        Literal p = helper_stack.back();
-        helper_stack.pop();
+    // (leave room for the asserting literal)
+    out_learnt.push();
+    int index = _trail.size() - 1;
 
-        if (reason(p.variable()) == CRAREF_UNDEF) {
-            out_learnt.push(p);
-        } else {
-            Clause& d = _ca[reason(p.variable())];
-            for (int i = 0; i < d.size(); i++) {
-                Literal q = d[i];
+    do {
+        std::cout << path_conflict << std::endl;
+        if (conflict == CRAREF_UNDEF) {
+            throw std::logic_error("Solver::analyze : no conflict to analyze!");
+        }
+        
+        Clause& c = _ca[conflict];
 
-                if (!_seen[q.variable()] && level(q.variable()) > 0) {
-                    _seen[q.variable()] = 1;
+        for (int j = (p == LITERAL_UNDEF) ? 0 : 1; j < c.size(); j++){
+            Literal q = c[j];
 
-                    if (level(q.variable()) < level(p.variable())) {
-                        out_learnt.push(q);
-                    } else {
-                        helper_stack.push(q);
-                    }
-                }
+            if (!_seen[q.variable()] && level(q.variable()) > 0){
+                _seen[q.variable()] = 1;
+                if (level(q.variable()) >= decision_level())
+                    path_conflict++;
+                else
+                    out_learnt.push(q);
             }
         }
-    }
+        
+        // Select next clause to look at:
+        while (!_seen[_trail[index--].variable()]);
+        p = _trail[index + 1];
+        conflict = reason(p.variable());
+        _seen[p.variable()] = 0;
+        path_conflict--;
+
+    } while (path_conflict > 0);
+    out_learnt[0] = ~p;
 
     // Find correct backtrack level:
-    int max_i = 0;
-    for (int i = 1; i < out_learnt.size(); i++) {
-        if (level(out_learnt[i].variable()) > level(out_learnt[max_i].variable()) ) {
-            max_i = i;
+    if (out_learnt.size() == 1) {
+        out_level = 0;
+    } else {
+        int max_i = 1;
+        // Find the first literal assigned at the next-highest level:
+        for (int i = 2; i < out_learnt.size(); i++) {
+            if (level(out_learnt[i].variable()) > 
+                level(out_learnt[max_i].variable())) {
+                max_i = i;
+            }
         }
+        // Swap-in this literal at index 1:
+        Literal p = out_learnt[max_i];
+        out_learnt[max_i] = out_learnt[1];
+        out_learnt[1] = p;
+        out_level = level(p.variable());
     }
-    out_level = level(out_learnt[max_i].variable());
 
     // Clear _seen
     for (Variable i = 0; i < n_variables(); i++) {
         _seen[i] = 0;
     }
+
+    std::cout << "analyze end==========================" << std::endl;
 }
 
 /**
@@ -258,82 +311,41 @@ LiftedBoolean Solver::search(int n_conflicts) {
     Vector<Literal> learnt_clause;
     int backtrack_level;
 
-    int sat, start = 1;
-
     for (; ;) {
         // Propagation
         CRARef conflict = propagate();
+        std::cout << conflict << std::endl;
+        if (conflict != CRAREF_UNDEF) {
+            if (decision_level() == 0) { return LIFTED_BOOLEAN_FALSE; }
 
-        sat = 1;
-        LiftedBoolean stat = LIFTED_BOOLEAN_FALSE;
-        for (auto& cr : _clauses) {
-            Clause& c = _ca[cr];
-            stat = is_satisfied(c);
-            if (stat != LIFTED_BOOLEAN_TRUE) {
-                sat = 0;
-                break;
-            }
-        }
+            learnt_clause.clear();
+            analyze(conflict, learnt_clause, backtrack_level);
+            cancel_until(backtrack_level);
 
-        if (sat == 1) {
-            return LIFTED_BOOLEAN_TRUE;
-        }
-
-        if (start) {
-            if (conflict != CRAREF_UNDEF) {
-                return LIFTED_BOOLEAN_FALSE;
-            }
-
-            start = 0;
-            new_decision_level();
-            Literal p = pick_branch_literal();
-            unchecked_enqueue(p);
-        } else {
-            if (stat == LIFTED_BOOLEAN_UNDEF && conflict == CRAREF_UNDEF) {
-                new_decision_level();
-                Literal p = pick_branch_literal();
-                unchecked_enqueue(p);
+            if (learnt_clause.size() == 1) {
+                unchecked_enqueue(learnt_clause[0]);
             } else {
-                // printf("Conflict\n");
-                //     for (int i = 0; i < n_variables(); i++) {
-                //         printf("%d ", _assigns[i].to_int());
-                //     }
-                //     printf("\n");
-                // printf("Back\n");
-
-                learnt_clause.clear();
-                analyze(conflict, learnt_clause, backtrack_level);
-                cancel_until(backtrack_level);
-
                 CRARef cr = _ca.alloc(learnt_clause, true);
                 _learnts.push(cr);
                 attach_clause_watcher(cr);
-
-                if (conflict != CRAREF_UNDEF) {
-                    Literal p = _trail[_trail_lim[_trail_lim.size() - 1]];
-                    cancel_until(decision_level() - 1);
-                    new_decision_level();
-                    unchecked_enqueue(p);
-                }
-
-                for (; decision_level() != 0 && _trail[_trail.size() - 1].sign();) {
-                    // for (int i = 0; i < n_variables(); i++) {
-                    //     printf("%d ", _assigns[i].to_int());
-                    // }
-                    // printf("\n");
-                    cancel_until(decision_level() - 1);
-                }
-                // printf("Back end\n");
-
-                if (decision_level() == 0) { 
-                    return LIFTED_BOOLEAN_FALSE; 
-                }
-
-                Literal p = _trail[_trail.size() - 1];
-                cancel_until(decision_level() - 1);
-                new_decision_level();
-                unchecked_enqueue(~p);
+                unchecked_enqueue(learnt_clause[0], cr);
             }
+        } else {
+            // NO CONFLICT
+            Literal next = LITERAL_UNDEF;
+
+            if (next == LITERAL_UNDEF){
+                // New variable decision:
+                next = pick_branch_literal();
+
+                if (next == LITERAL_UNDEF)
+                    // Model found:
+                    return LIFTED_BOOLEAN_TRUE;
+            }
+
+            // Increase decision level and enqueue 'next'
+            new_decision_level();
+            unchecked_enqueue(next);
         }
     }
 }

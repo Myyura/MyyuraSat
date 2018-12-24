@@ -84,24 +84,59 @@ void Solver::remove_clause(CRARef cr) {
 
 void Solver::reloc_all(ClauseAllocator& to) {
     // Watchers:
-    // _watches.clean_all();
-    // for (int v = 0; v < n_variables(); v++) {
-    //     for (int s = 0; s < 2; s++) {
-    //         Literal p(v, s);
-    //         Vector<_Watcher>& ws = _watches[p];
-    //         for (int j = 0; j < ws.size(); j++) {
-    //             _ca.reloc(ws[j].cref, to);
-    //         }
-    //     }
-    // }
+    _watches.clean_all();
+    for (int v = 0; v < n_variables(); v++) {
+        for (int s = 0; s < 2; s++) {
+            Literal p(v, s);
+            Vector<_Watcher>& ws = _watches[p];
+            for (int j = 0; j < ws.size(); j++) {
+                _ca.reloc(ws[j].cref, to);
+            }
+        }
+    }
+
+    // Occlits
+    _occur_lit.clean_all();
+    for (int v = 0; v < n_variables(); v++) {
+        for (int s = 0; s < 2; s++) {
+            Literal p(v, s);
+            Vector<CRARef>& cs = _occur_lit[p];
+            for (int j = 0; j < cs.size(); j++) {
+                _ca.reloc(cs[j], to);
+            }
+        }
+    }
 
     // Reasons:
+    for (int i = 0; i < _trail.size(); i++) {
+        Variable v = _trail[i].variable();
+
+        /**
+         * Note: it is not safe to call 'locked()' on a relocated clause. This 
+         * is why we keep 'dangling' reasons here. It is safe and does not hurt.
+         */
+        if (reason(v) != CRAREF_UNDEF && 
+            (_ca[reason(v)].reloced() || is_locked(_ca[reason(v)]))) {
+            if (is_removed(reason(v))) {
+                throw std::logic_error("Solver::reloc_all : reason is already removed!");
+            }
+
+            _ca.reloc(_variable_info[v].reason, to);
+        }
+    }
 
     int i, j;
     // Learnts:
+    for (i = j = 0; i < _learnts.size(); i++) {
+        if (!is_removed(_learnts[i])) {
+            _ca.reloc(_learnts[i], to);
+            _learnts[j++] = _learnts[i];
+        }
+    }
+    _learnts.shrink(i - j);
+
 
     // Original:
-
     for (i = j = 0; i < _clauses.size(); i++) {
         if (!is_removed(_clauses[i])) {
             _ca.reloc(_clauses[i], to);

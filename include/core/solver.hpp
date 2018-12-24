@@ -58,7 +58,8 @@ private:
     // '_watches[lit]' is a list of constraints watching 'lit' (will go there if literal becomes true)
     struct _Watcher {
         CRARef cref;
-        _Watcher(CRARef cr): cref(cr) {}
+        Literal blocker;
+        _Watcher(CRARef cr, Literal p): cref(cr), blocker(p) {}
 
         bool operator==(const _Watcher& w) const { return cref == w.cref; }
         bool operator!=(const _Watcher& w) const { return cref != w.cref; }
@@ -163,6 +164,9 @@ private:
     CRARef reason(Variable x) const;
     int level(Variable x) const;
 
+    // Only used in toplevel
+    void toplevel_simplify_satisfied_clause(Vector<CRARef>& cs);
+
     /**
      * Subsumption:
      * 
@@ -175,17 +179,19 @@ private:
     OccurenceList<Literal, CRARef, Vector<CRARef>, LiteralIndexDefault> _occur_lit;
 
     void attach_clause_occlit(CRARef cr, CRARef overwrite = CRAREF_UNDEF);
+    void detach_clause_occlit(CRARef cr, bool strict = false);
 
     VMap<bool> _touched;
     Vector<Variable> _touched_list;
     CSet _added;
     CSet _strengthened;
 
-    void find_subsumed(CRARef cr, Vector<CRARef>& out_subsumed);
     bool is_subsumed(CRARef cr);
-    void reduction_subsumption(CRARef cr);
+    void subsume0(CRARef cr);
+    void subsume1(CRARef cr);
     void touch(const Variable& x);
     void touch(const Literal& p);
+    void reduction_by_subsumption(void);
 
     /**
      * Temporaries (to reduce allocation overhead)

@@ -246,9 +246,9 @@ private:
 public:
     static const std::size_t UNIT_SIZE = RegionAllocator<uint32_t>::UNIT_SIZE;
 
-    ClauseAllocator(uint32_t start_cap) : _ra(start_cap), _extra_clause_field(false) {}
+    ClauseAllocator(uint32_t start_cap) : _ra(start_cap), _extra_clause_field(true) {}
 
-    ClauseAllocator(void) : _extra_clause_field(false) {}
+    ClauseAllocator(void) : _extra_clause_field(true) {}
 
     void move_to(ClauseAllocator& to) {
         to._extra_clause_field = _extra_clause_field;

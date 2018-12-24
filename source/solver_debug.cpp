@@ -9,6 +9,7 @@
 using namespace MyyuraSat;
 
 bool Solver::solve_test(void) {
+    // std::cout << "ca size: " << _ca.size() << std::endl;
     std::cout << "Start search! ==================" << std::endl;
     LiftedBoolean status = search(100);
     std::cout << "Finished search! ===============" << std::endl;
@@ -80,7 +81,7 @@ void Solver::subsumption_test(void) {
 
     _ca.extra_clause_field(true);
 
-    print_clauses();
+    // print_clauses();
 
     add_clause(A);
     add_clause(B);
@@ -90,11 +91,9 @@ void Solver::subsumption_test(void) {
     add_clause(F);
     add_clause(G);
 
-    check_garbage();
+    // check_garbage();
 
     print_clauses();
-    // reduction_subsumption(_clauses[1]);
-    // print_clauses();
-
-
+    subsume0(_clauses[1]);
+    print_clauses();
 }
